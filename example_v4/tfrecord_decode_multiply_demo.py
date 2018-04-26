@@ -8,7 +8,7 @@ import matplotlib.cm as mpcm
 
 slim = tf.contrib.slim
 
-NUM_CLASSES = 1
+NUM_CLASSES = 1000
 SPLITS_TO_SIZES = {
     'train': 5011,
     'val': 4952,
@@ -23,7 +23,7 @@ labels_to_class =['none','hand','hand','hand','hand','hand','hand','hand','hand'
                   'hand','hand','hand','hand','hand','hand','hand','hand','hand','hand','hand','hand','hand','hand','hand','hand','hand','hand'
                   'hand','hand','hand','hand','hand','hand','hand','hand','hand','hand','hand','hand','hand']
 
-FILE_PATTERN = 'pet_%s.record'
+FILE_PATTERN = 'coco_%s.record'
 
 def _get_output_filename(dataset_dir, split_name):
     """Creates the output filename.
@@ -56,7 +56,7 @@ def bboxes_draw_on_img(img, classes, bboxes, colors, thickness=1):
         p2 = (int(bbox[2] * shape[0]), int(bbox[3] * shape[1]))
         cv2.rectangle(img, p1[::-1], p2[::-1], color, thickness)
         # Draw text...
-        s = '%s' % (labels_to_class[classes[i]])
+        s = '%s' % (classes[i])
         p1 = (p1[0]+15, p1[1]+5)
         cv2.putText(img, s, p1[::-1], cv2.FONT_HERSHEY_DUPLEX, 0.4, color, 1)
         
@@ -128,7 +128,7 @@ def test():
                         num_readers=3,
                         common_queue_capacity=20 * 1,
                         common_queue_min=10 * 1,
-                        shuffle=False)
+                        shuffle=True)
     
 
     for item in provider._items_to_tensors:
@@ -138,31 +138,25 @@ def test():
                                                'object/label',
                                                'object/bbox'])
     
-    colors_plasma = colors_subselect(mpcm.plasma.colors, num_classes=38)
+    colors_plasma = colors_subselect(mpcm.plasma.colors, num_classes=100)
     
     init=tf.global_variables_initializer()
     with tf.Session() as session:
         session.run(init)
         coord = tf.train.Coordinator()
         threads = tf.train.start_queue_runners(coord=coord)
-        print('Start verification process...')
+        print('Start verification process...',provider._num_samples)
         for l in range(provider._num_samples):
-            enc_image = tf.image.encode_jpeg(image)
-            img, labels, boxes = session.run([enc_image,  glabels, gbboxes])
-#             img=tf.reshape(img,tf.stack([shaps[0],shaps[1],shaps[2]]))
-            f = tf.gfile.FastGFile('out.jpg' , 'wb')
-            f.write(img)
-            f.close()
+            np_image, labels, boxes = session.run([image,  glabels, gbboxes])
+
             for j in range(labels.shape[0]):
                 print('label=%d class(%s) at bbox[%f, %f, %f, %f]' % (
-                    labels[j], labels_to_class[labels[j]], 
+                    labels[j], labels[j], 
                     boxes[j][0], boxes[j][1],boxes[j][2],  boxes[j][3]))
-            
-            img = cv2.imread('out.jpg' )
-            
-            
-            bboxes_draw_on_img(img, labels, boxes, colors_plasma)
-            cv2.imshow('Object Detection Image',img)
+                
+                     
+            bboxes_draw_on_img(np_image, labels, boxes, colors_plasma)
+            cv2.imshow('Object Detection Image',np_image)
             cv2.waitKey(0)
 
         coord.request_stop()
